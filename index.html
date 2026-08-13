@@ -93,6 +93,7 @@
     font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--text-muted); margin: 0 0 12px 2px; font-weight: 700;
   }
+  .hint { font-size: 12px; color: var(--text-muted); margin: -4px 0 12px 2px; }
   .cards {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;
   }
@@ -183,28 +184,40 @@
 
 <main>
 
-  <details class="config" id="configBox">
-    <summary>⚙️ Configuración — API key para acciones (ADRs argentinas)</summary>
+  <details class="config" id="configBox" open>
+    <summary>⚙️ Configuración — API keys (gratis, 1 minuto cada una)</summary>
     <div class="config-body">
-      El precio de <b>cripto</b> se obtiene gratis y sin registro (CoinGecko). Para <b>acciones</b> necesitás una
-      API key gratuita de <a href="https://twelvedata.com/apikey" target="_blank" rel="noopener">Twelve Data</a>
-      (tarda ~1 minuto: te registrás con tu email y te dan la key). Como Merval/BYMA no tiene una API gratuita
-      accesible desde el navegador, uso las acciones argentinas que cotizan como <b>ADR en Nueva York</b>:
-      GGAL (Galicia), YPF, PAM (Pampa Energía), BMA (Banco Macro) y SUPV (Supervielle) — mismo negocio, mismo precio en dólares.
+      CoinGecko cambió su política: ahora hasta el plan gratuito pide una <b>API key "Demo"</b> (antes no hacía
+      falta). Son dos keys distintas, ambas gratis:
       <div class="config-row">
+        <b style="min-width:110px; display:inline-block;">Cripto</b>
+        <input type="text" id="apiKeyCoinGeckoInput" placeholder="Pegá tu Demo API key de CoinGecko acá">
+        <button class="primary" id="saveCoinGeckoKeyBtn">Guardar</button>
+        <a href="https://www.coingecko.com/en/api/pricing" target="_blank" rel="noopener" style="font-size:12px;">Sacar key gratis →</a>
+      </div>
+      <div class="config-row">
+        <b style="min-width:110px; display:inline-block;">Acciones</b>
         <input type="text" id="apiKeyInput" placeholder="Pegá tu API key de Twelve Data acá">
-        <button class="primary" id="saveKeyBtn">Guardar y cargar acciones</button>
-        <span id="keyStatus" style="font-size:12px;color:var(--text-muted);"></span>
+        <button class="primary" id="saveKeyBtn">Guardar</button>
+        <a href="https://twelvedata.com/apikey" target="_blank" rel="noopener" style="font-size:12px;">Sacar key gratis →</a>
+      </div>
+      <span id="keyStatus" style="font-size:12px;color:var(--text-muted); display:block; margin-top:4px;"></span>
+      <div style="margin-top:8px; font-size:11.5px;">
+        Como Merval/BYMA no tiene una API gratuita accesible desde el navegador, las "acciones" son las
+        argentinas que cotizan como <b>ADR en Nueva York</b>: GGAL (Galicia), YPF, PAM (Pampa Energía),
+        BMA (Banco Macro) y SUPV (Supervielle) — mismo negocio, mismo precio en dólares.
       </div>
       <div style="margin-top:8px; font-size:11.5px;">
-        Nota: la key se usa solo en esta pestaña (no se guarda en el navegador), así que hay que pegarla de nuevo
-        cada vez que abrís el archivo. Si querés que quede grabada directo en el archivo, pedímelo y te lo dejo listo.
+        Nota: las keys se usan solo en esta pestaña (no se guardan en el navegador), así que hay que pegarlas de
+        nuevo cada vez que abrís la página. Si querés que queden grabadas directo en el archivo, pasámelas y te
+        lo dejo listo.
       </div>
     </div>
   </details>
 
   <section class="group">
     <h2>Cripto</h2>
+    <div class="hint">👆 Hacé clic en una tarjeta para ver el gráfico y el detalle de la señal</div>
     <div class="cards" id="cryptoCards"></div>
   </section>
 
@@ -264,8 +277,9 @@
 (function () {
   "use strict";
 
-  // ---- Config: hardcode a Twelve Data key here if you have one, so it loads without typing it in ----
+  // ---- Config: hardcode keys here if you have them, so the page loads without typing them in ----
   const TWELVE_DATA_API_KEY = "";
+  const COINGECKO_API_KEY = "";
 
   const CRYPTO_ASSETS = [
     { id: "bitcoin", symbol: "BTC", name: "Bitcoin", type: "crypto" },
@@ -288,6 +302,7 @@
 
   const state = {
     apiKey: TWELVE_DATA_API_KEY,
+    coingeckoKey: COINGECKO_API_KEY,
     data: {},         // id -> { daily:[{t,c}], weekly:[{t,c}], error:string|null, loading:bool }
     selectedId: null,
     tf: "1d",
@@ -379,8 +394,10 @@
 
   // ---------- fetching ----------
   async function fetchCrypto(id) {
-    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=500`;
+    if (!state.coingeckoKey) throw new Error("Falta la API key de CoinGecko (ver ⚙️ Configuración)");
+    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=500&x_cg_demo_api_key=${encodeURIComponent(state.coingeckoKey)}`;
     const res = await fetch(url);
+    if (res.status === 401 || res.status === 403) throw new Error("API key de CoinGecko inválida o vencida");
     if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
     const json = await res.json();
     const prices = json.prices || [];
@@ -462,6 +479,13 @@
     const d = state.data[asset.id];
     const active = state.selectedId === asset.id ? "active" : "";
     if (asset.type === "stock" && !state.apiKey && !d) {
+      return `<div class="card ${active}" data-id="${asset.id}">
+        <div class="row1"><span class="sym">${asset.symbol}</span></div>
+        <div class="name">${asset.name}</div>
+        <div class="loading">Requiere API key (ver ⚙️ Configuración)</div>
+      </div>`;
+    }
+    if (asset.type === "crypto" && !state.coingeckoKey && !d) {
       return `<div class="card ${active}" data-id="${asset.id}">
         <div class="row1"><span class="sym">${asset.symbol}</span></div>
         <div class="name">${asset.name}</div>
@@ -674,7 +698,7 @@
 
   async function refreshAll() {
     setStatus("actualizando…", true);
-    await loadAll(CRYPTO_ASSETS, 400);
+    if (state.coingeckoKey) await loadAll(CRYPTO_ASSETS, 800);
     if (state.apiKey) await loadAll(STOCK_ASSETS, 1200);
     const now = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
     setStatus("última actualización " + now, true);
@@ -698,8 +722,16 @@
     const val = document.getElementById("apiKeyInput").value.trim();
     if (!val) return;
     state.apiKey = val;
-    document.getElementById("keyStatus").textContent = "Key cargada, buscando acciones…";
+    document.getElementById("keyStatus").textContent = "Key de Twelve Data cargada, buscando acciones…";
     loadAll(STOCK_ASSETS, 1200);
+  });
+  document.getElementById("saveCoinGeckoKeyBtn").addEventListener("click", () => {
+    const val = document.getElementById("apiKeyCoinGeckoInput").value.trim();
+    if (!val) return;
+    state.coingeckoKey = val;
+    document.getElementById("keyStatus").textContent = "Key de CoinGecko cargada, buscando cripto…";
+    loadAll(CRYPTO_ASSETS, 800);
+    scheduleAutoRefresh();
   });
 
   // ---------- init ----------
