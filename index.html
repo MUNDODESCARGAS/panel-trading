@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Trading — Cripto &amp; Acciones</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"
+  onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';document.head.appendChild(s);"></script>
+<style>
+  .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --surface-2:      #222221;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-price:   #3987e5;
+    --series-sma20:   #199e70;
+    --series-sma50:   #d95926;
+    --series-rsi:     #9085e9;
+    --good:           #0ca30c;
+    --warning:        #fab219;
+    --critical:       #e66767;
+    --neutral:        #898781;
+  }
+  .viz-root[data-theme="light"] {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --surface-2:      #f3f2ef;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-price:   #2a78d6;
+    --series-sma20:   #1baf7a;
+    --series-sma50:   #eb6834;
+    --series-rsi:     #4a3aa7;
+    --good:           #0ca30c;
+    --warning:        #fab219;
+    --critical:       #d03b3b;
+    --neutral:        #52514e;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .viz-root { min-height: 100vh; padding-bottom: 60px; }
+  a { color: var(--series-price); }
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 20px 28px; border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+    position: sticky; top: 0; z-index: 20;
+  }
+  header.top h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header.top .sub { color: var(--text-muted); font-size: 12.5px; margin-top: 2px; }
+  .top-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  button {
+    font-family: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-primary); padding: 8px 14px; font-size: 13px;
+    font-weight: 600;
+  }
+  button:hover { filter: brightness(1.15); }
+  button.primary { background: var(--series-price); color: #fff; border-color: transparent; }
+  .status-pill {
+    font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 28px; }
+  details.config {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 22px;
+  }
+  details.config summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .config-body { margin-top: 14px; font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+  .config-body input[type=text] {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
+    padding: 8px 10px; border-radius: 6px; font-size: 13px; width: 280px; max-width: 100%;
+  }
+  .config-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  section.group { margin-bottom: 30px; }
+  section.group h2 {
+    font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); margin: 0 0 12px 2px; font-weight: 700;
+  }
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;
+  }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; cursor: pointer; transition: transform .12s ease, border-color .12s ease;
+    text-align: left;
+  }
+  .card:hover { border-color: var(--series-price); transform: translateY(-2px); }
+  .card.active { border-color: var(--series-price); box-shadow: 0 0 0 1px var(--series-price) inset; }
+  .card .row1 { display: flex; justify-content: space-between; align-items: baseline; }
+  .card .sym { font-weight: 700; font-size: 15px; }
+  .card .name { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+  .card .price { font-size: 18px; font-weight: 700; margin-top: 8px; }
+  .card .chg { font-size: 12.5px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .chg.up { color: var(--good); }
+  .chg.down { color: var(--critical); }
+  .badges { display: flex; gap: 6px; margin-top: 10px; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 6px;
+    display: flex; align-items: center; gap: 4px; letter-spacing: 0.02em;
+  }
+  .badge .tf { opacity: 0.7; font-weight: 600; font-size: 10px; }
+  .badge.compra { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+  .badge.venta { background: color-mix(in srgb, var(--critical) 18%, transparent); color: var(--critical); }
+  .badge.neutral { background: color-mix(in srgb, var(--neutral) 20%, transparent); color: var(--text-secondary); }
+  .badge.nd { background: transparent; color: var(--text-muted); }
+  .fresh { color: var(--warning); font-size: 10px; margin-top: 6px; font-weight: 700; }
+  .card .err { color: var(--critical); font-size: 11.5px; margin-top: 8px; }
+  .card .loading { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
+
+  #detail { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-top: 8px; }
+  .hidden { display: none !important; }
+  .detail-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
+  .detail-title { font-size: 20px; font-weight: 700; }
+  .detail-price { font-size: 15px; color: var(--text-secondary); margin-top: 3px; }
+  .tabs { display: flex; gap: 6px; }
+  .tab-btn { background: var(--surface-2); }
+  .tab-btn.active { background: var(--series-price); color: #fff; border-color: transparent; }
+  .signal-panel {
+    display: flex; align-items: center; gap: 14px; margin: 18px 0; padding: 14px 16px;
+    border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .signal-big { font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .signal-big.compra { color: var(--good); }
+  .signal-big.venta { color: var(--critical); }
+  .signal-big.neutral { color: var(--text-secondary); }
+  .signal-detail { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+  .legend-row { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin: 10px 2px 4px; flex-wrap: wrap; }
+  .legend-row .item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 14px; height: 2px; border-radius: 2px; display: inline-block; }
+  .swatch.dot { width: 8px; height: 8px; border-radius: 50%; }
+  canvas { max-width: 100%; }
+  .chart-wrap { position: relative; height: 280px; margin-top: 6px; }
+  .rsi-wrap { position: relative; height: 110px; margin-top: 18px; }
+  table.mini { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+  table.mini th, table.mini td {
+    text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid);
+    font-variant-numeric: tabular-nums; color: var(--text-secondary);
+  }
+  table.mini th:first-child, table.mini td:first-child { text-align: left; color: var(--text-muted); }
+  table.mini th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  .disclaimer {
+    max-width: 1180px; margin: 30px auto 0; padding: 16px 28px; font-size: 12px;
+    color: var(--text-muted); line-height: 1.6; border-top: 1px solid var(--border);
+  }
+  .empty-detail { color: var(--text-muted); font-size: 13px; padding: 30px 4px; text-align: center; }
+  @media (max-width: 640px) {
+    main { padding: 18px 14px; }
+    header.top { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="viz-root" data-theme="dark" id="root">
+
+<header class="top">
+  <div>
+    <h1>📊 Panel de Trading — Cripto &amp; Acciones</h1>
+    <div class="sub">Señales técnicas automáticas en 1D y 1 semana · no es asesoramiento financiero</div>
+  </div>
+  <div class="top-controls">
+    <span class="status-pill" id="statusPill"><span class="status-dot" id="statusDot"></span><span id="statusText">actualizando…</span></span>
+    <button id="refreshBtn">↻ Actualizar</button>
+    <button id="themeBtn">🌙 / ☀️</button>
+  </div>
+</header>
+
+<main>
+
+  <details class="config" id="configBox">
+    <summary>⚙️ Configuración — API key para acciones (ADRs argentinas)</summary>
+    <div class="config-body">
+      El precio de <b>cripto</b> se obtiene gratis y sin registro (CoinGecko). Para <b>acciones</b> necesitás una
+      API key gratuita de <a href="https://twelvedata.com/apikey" target="_blank" rel="noopener">Twelve Data</a>
+      (tarda ~1 minuto: te registrás con tu email y te dan la key). Como Merval/BYMA no tiene una API gratuita
+      accesible desde el navegador, uso las acciones argentinas que cotizan como <b>ADR en Nueva York</b>:
+      GGAL (Galicia), YPF, PAM (Pampa Energía), BMA (Banco Macro) y SUPV (Supervielle) — mismo negocio, mismo precio en dólares.
+      <div class="config-row">
+        <input type="text" id="apiKeyInput" placeholder="Pegá tu API key de Twelve Data acá">
+        <button class="primary" id="saveKeyBtn">Guardar y cargar acciones</button>
+        <span id="keyStatus" style="font-size:12px;color:var(--text-muted);"></span>
+      </div>
+      <div style="margin-top:8px; font-size:11.5px;">
+        Nota: la key se usa solo en esta pestaña (no se guarda en el navegador), así que hay que pegarla de nuevo
+        cada vez que abrís el archivo. Si querés que quede grabada directo en el archivo, pedímelo y te lo dejo listo.
+      </div>
+    </div>
+  </details>
+
+  <section class="group">
+    <h2>Cripto</h2>
+    <div class="cards" id="cryptoCards"></div>
+  </section>
+
+  <section class="group">
+    <h2>Acciones — ADRs argentinas</h2>
+    <div class="cards" id="stockCards"></div>
+  </section>
+
+  <div id="detail" class="hidden">
+    <div class="detail-head">
+      <div>
+        <div class="detail-title" id="detTitle">—</div>
+        <div class="detail-price" id="detPrice">—</div>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tf="1d" id="tab1d">1 Día</button>
+        <button class="tab-btn" data-tf="1w" id="tab1w">1 Semana</button>
+      </div>
+    </div>
+
+    <div class="signal-panel">
+      <div class="signal-big neutral" id="signalBig">— NEUTRAL</div>
+      <div class="signal-detail" id="signalDetail">Sin datos suficientes todavía.</div>
+    </div>
+
+    <div class="legend-row">
+      <span class="item"><span class="swatch" style="background:var(--series-price)"></span>Precio de cierre</span>
+      <span class="item"><span class="swatch" style="background:var(--series-sma20)"></span>Media móvil corta (20)</span>
+      <span class="item"><span class="swatch" style="background:var(--series-sma50)"></span>Media móvil larga (50)</span>
+    </div>
+    <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+
+    <div class="legend-row">
+      <span class="item"><span class="swatch" style="background:var(--series-rsi)"></span>RSI (14)</span>
+      <span class="item" style="color:var(--text-muted)">70 = sobrecompra · 30 = sobreventa</span>
+    </div>
+    <div class="rsi-wrap"><canvas id="rsiChart"></canvas></div>
+
+    <table class="mini" id="miniTable"><thead></thead><tbody></tbody></table>
+  </div>
+  <div class="empty-detail" id="emptyDetail">Elegí un activo de arriba para ver el gráfico y el detalle de la señal.</div>
+
+</main>
+
+<div class="disclaimer">
+  <b>Aviso:</b> esta página no es asesoramiento financiero. Las señales de "compra" / "venta" se generan
+  automáticamente con indicadores técnicos estándar (cruce de medias móviles de 20/50 períodos + RSI de 14),
+  aplicados de forma mecánica sobre datos históricos de precio de cierre. Son una referencia informativa, no una
+  recomendación de inversión: pueden fallar, llegar tarde o contradecirse entre sí. Antes de tomar decisiones con
+  dinero real, verificá la información con otras fuentes y, si corresponde, consultá a un asesor financiero matriculado.
+  Datos de cripto vía CoinGecko; datos de acciones vía Twelve Data.
+</div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Config: hardcode a Twelve Data key here if you have one, so it loads without typing it in ----
+  const TWELVE_DATA_API_KEY = "";
+
+  const CRYPTO_ASSETS = [
+    { id: "bitcoin", symbol: "BTC", name: "Bitcoin", type: "crypto" },
+    { id: "ethereum", symbol: "ETH", name: "Ethereum", type: "crypto" },
+    { id: "solana", symbol: "SOL", name: "Solana", type: "crypto" },
+    { id: "binancecoin", symbol: "BNB", name: "BNB", type: "crypto" },
+    { id: "ripple", symbol: "XRP", name: "XRP", type: "crypto" },
+    { id: "cardano", symbol: "ADA", name: "Cardano", type: "crypto" }
+  ];
+
+  const STOCK_ASSETS = [
+    { id: "GGAL", symbol: "GGAL", name: "Grupo Fin. Galicia (ADR)", type: "stock" },
+    { id: "YPF", symbol: "YPF", name: "YPF (ADR)", type: "stock" },
+    { id: "PAM", symbol: "PAM", name: "Pampa Energía (ADR)", type: "stock" },
+    { id: "BMA", symbol: "BMA", name: "Banco Macro (ADR)", type: "stock" },
+    { id: "SUPV", symbol: "SUPV", name: "Grupo Supervielle (ADR)", type: "stock" }
+  ];
+
+  const ALL_ASSETS = [...CRYPTO_ASSETS, ...STOCK_ASSETS];
+
+  const state = {
+    apiKey: TWELVE_DATA_API_KEY,
+    data: {},         // id -> { daily:[{t,c}], weekly:[{t,c}], error:string|null, loading:bool }
+    selectedId: null,
+    tf: "1d",
+    priceChart: null,
+    rsiChart: null,
+    theme: "dark"
+  };
+
+  // ---------- indicators ----------
+  function sma(closes, period) {
+    const out = new Array(closes.length).fill(null);
+    let sum = 0;
+    for (let i = 0; i < closes.length; i++) {
+      sum += closes[i];
+      if (i >= period) sum -= closes[i - period];
+      if (i >= period - 1) out[i] = sum / period;
+    }
+    return out;
+  }
+
+  function rsi(closes, period) {
+    period = period || 14;
+    const out = new Array(closes.length).fill(null);
+    if (closes.length < period + 1) return out;
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+      const diff = closes[i] - closes[i - 1];
+      if (diff >= 0) gains += diff; else losses -= diff;
+    }
+    let avgGain = gains / period, avgLoss = losses / period;
+    out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    for (let i = period + 1; i < closes.length; i++) {
+      const diff = closes[i] - closes[i - 1];
+      const gain = diff > 0 ? diff : 0;
+      const loss = diff < 0 ? -diff : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    }
+    return out;
+  }
+
+  function isoWeekKey(ms) {
+    const d = new Date(ms);
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    return d.getUTCFullYear() + "-W" + weekNo;
+  }
+
+  function toWeekly(daily) {
+    const map = new Map();
+    for (const pt of daily) map.set(isoWeekKey(pt.t), pt); // ascending order -> last wins per week
+    return Array.from(map.values());
+  }
+
+  function computeSignal(series) {
+    const closes = series.map(p => p.c);
+    const n = closes.length;
+    const short = sma(closes, 20);
+    const long = sma(closes, 50);
+    const r = rsi(closes, 14);
+    if (n === 0) return { signal: "N/D", ok: false };
+    const lastShort = short[n - 1], lastLong = long[n - 1], lastRSI = r[n - 1];
+    if (lastShort == null || lastLong == null) {
+      return { signal: "N/D", ok: false, closes, short, long, r };
+    }
+    let signal = "NEUTRAL";
+    if (lastShort > lastLong && (lastRSI == null || lastRSI < 70)) signal = "COMPRA";
+    else if (lastShort < lastLong && (lastRSI == null || lastRSI > 30)) signal = "VENTA";
+
+    let freshCross = false;
+    for (let i = Math.max(1, n - 3); i < n; i++) {
+      if (short[i - 1] != null && long[i - 1] != null && short[i] != null && long[i] != null) {
+        const prevDiff = short[i - 1] - long[i - 1];
+        const curDiff = short[i] - long[i];
+        if ((prevDiff <= 0 && curDiff > 0) || (prevDiff >= 0 && curDiff < 0)) freshCross = true;
+      }
+    }
+    return {
+      signal, ok: true, freshCross,
+      rsi: lastRSI, smaShort: lastShort, smaLong: lastLong,
+      lastClose: closes[n - 1],
+      prevClose: n > 1 ? closes[n - 2] : null,
+      closes, short, long, r
+    };
+  }
+
+  // ---------- fetching ----------
+  async function fetchCrypto(id) {
+    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=500`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
+    const json = await res.json();
+    const prices = json.prices || [];
+    // collapse to one point per UTC day (keep last of each day)
+    const byDay = new Map();
+    for (const [t, c] of prices) {
+      const day = new Date(t); day.setUTCHours(0, 0, 0, 0);
+      byDay.set(day.getTime(), { t: day.getTime(), c });
+    }
+    return Array.from(byDay.values()).sort((a, b) => a.t - b.t);
+  }
+
+  async function fetchStock(symbol) {
+    if (!state.apiKey) throw new Error("Falta la API key de Twelve Data (ver Configuración arriba)");
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=500&apikey=${encodeURIComponent(state.apiKey)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status === "error") throw new Error(json.message || "Error de Twelve Data");
+    if (!json.values) throw new Error("Respuesta inesperada de Twelve Data");
+    return json.values
+      .slice()
+      .reverse()
+      .map(v => ({ t: new Date(v.datetime + "T00:00:00Z").getTime(), c: parseFloat(v.close) }));
+  }
+
+  async function loadAsset(asset) {
+    state.data[asset.id] = state.data[asset.id] || {};
+    state.data[asset.id].loading = true;
+    state.data[asset.id].error = null;
+    renderCards();
+    try {
+      const daily = asset.type === "crypto" ? await fetchCrypto(asset.id) : await fetchStock(asset.symbol);
+      const weekly = toWeekly(daily);
+      state.data[asset.id] = {
+        loading: false, error: null,
+        daily, weekly,
+        sigDaily: computeSignal(daily),
+        sigWeekly: computeSignal(weekly)
+      };
+    } catch (e) {
+      state.data[asset.id] = { loading: false, error: e.message || String(e) };
+    }
+    renderCards();
+    if (state.selectedId === asset.id) renderDetail();
+  }
+
+  async function loadAll(assets, staggerMs) {
+    for (let i = 0; i < assets.length; i++) {
+      loadAsset(assets[i]);
+      if (staggerMs) await new Promise(r => setTimeout(r, staggerMs));
+    }
+  }
+
+  // ---------- formatting ----------
+  function fmtPrice(v) {
+    if (v == null || isNaN(v)) return "—";
+    if (v >= 1000) return "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    if (v >= 1) return "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return "$" + v.toPrecision(4);
+  }
+  function fmtPct(v) {
+    if (v == null || isNaN(v)) return "—";
+    const s = v >= 0 ? "+" : "";
+    return s + v.toFixed(2) + "%";
+  }
+  function fmtDate(ms) {
+    return new Date(ms).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  }
+
+  function badgeHtml(sig, tfLabel) {
+    if (!sig || !sig.ok) return `<span class="badge nd"><span class="tf">${tfLabel}</span> N/D</span>`;
+    const cls = sig.signal === "COMPRA" ? "compra" : sig.signal === "VENTA" ? "venta" : "neutral";
+    const icon = sig.signal === "COMPRA" ? "▲" : sig.signal === "VENTA" ? "▼" : "●";
+    return `<span class="badge ${cls}"><span class="tf">${tfLabel}</span> ${icon} ${sig.signal}</span>`;
+  }
+
+  // ---------- rendering: cards ----------
+  function cardHtml(asset) {
+    const d = state.data[asset.id];
+    const active = state.selectedId === asset.id ? "active" : "";
+    if (asset.type === "stock" && !state.apiKey && !d) {
+      return `<div class="card ${active}" data-id="${asset.id}">
+        <div class="row1"><span class="sym">${asset.symbol}</span></div>
+        <div class="name">${asset.name}</div>
+        <div class="loading">Requiere API key (ver ⚙️ Configuración)</div>
+      </div>`;
+    }
+    if (!d || d.loading) {
+      return `<div class="card ${active}" data-id="${asset.id}">
+        <div class="row1"><span class="sym">${asset.symbol}</span></div>
+        <div class="name">${asset.name}</div>
+        <div class="loading">Cargando…</div>
+      </div>`;
+    }
+    if (d.error) {
+      return `<div class="card ${active}" data-id="${asset.id}">
+        <div class="row1"><span class="sym">${asset.symbol}</span></div>
+        <div class="name">${asset.name}</div>
+        <div class="err">⚠ ${d.error}</div>
+      </div>`;
+    }
+    const last = d.sigDaily.lastClose, prev = d.sigDaily.prevClose;
+    const chgPct = (last != null && prev != null) ? ((last - prev) / prev) * 100 : null;
+    const chgCls = chgPct == null ? "" : (chgPct >= 0 ? "up" : "down");
+    const fresh = (d.sigDaily.freshCross || d.sigWeekly.freshCross) ? `<div class="fresh">🔥 cruce reciente de medias</div>` : "";
+    return `<div class="card ${active}" data-id="${asset.id}">
+      <div class="row1"><span class="sym">${asset.symbol}</span></div>
+      <div class="name">${asset.name}</div>
+      <div class="price">${fmtPrice(last)}</div>
+      <div class="chg ${chgCls}">${fmtPct(chgPct)} (1d)</div>
+      <div class="badges">${badgeHtml(d.sigDaily, "1D")}${badgeHtml(d.sigWeekly, "1W")}</div>
+      ${fresh}
+    </div>`;
+  }
+
+  function renderCards() {
+    document.getElementById("cryptoCards").innerHTML = CRYPTO_ASSETS.map(cardHtml).join("");
+    document.getElementById("stockCards").innerHTML = STOCK_ASSETS.map(cardHtml).join("");
+    document.querySelectorAll(".card").forEach(el => {
+      el.addEventListener("click", () => selectAsset(el.getAttribute("data-id")));
+    });
+  }
+
+  // ---------- rendering: detail ----------
+  function selectAsset(id) {
+    state.selectedId = id;
+    document.getElementById("emptyDetail").classList.add("hidden");
+    document.getElementById("detail").classList.remove("hidden");
+    renderCards();
+    renderDetail();
+  }
+
+  function cssVar(name) {
+    return getComputedStyle(document.getElementById("root")).getPropertyValue(name).trim();
+  }
+
+  function renderDetail() {
+    const asset = ALL_ASSETS.find(a => a.id === state.selectedId);
+    if (!asset) return;
+    const d = state.data[asset.id];
+    document.getElementById("detTitle").textContent = `${asset.symbol} — ${asset.name}`;
+    document.getElementById("tab1d").classList.toggle("active", state.tf === "1d");
+    document.getElementById("tab1w").classList.toggle("active", state.tf === "1w");
+
+    if (!d || d.loading) {
+      document.getElementById("detPrice").textContent = "Cargando…";
+      return;
+    }
+    if (d.error) {
+      document.getElementById("detPrice").textContent = "Error: " + d.error;
+      document.getElementById("signalBig").textContent = "— N/D";
+      document.getElementById("signalBig").className = "signal-big neutral";
+      document.getElementById("signalDetail").textContent = "";
+      return;
+    }
+
+    const sig = state.tf === "1d" ? d.sigDaily : d.sigWeekly;
+    const series = state.tf === "1d" ? d.daily : d.weekly;
+
+    document.getElementById("detPrice").textContent =
+      fmtPrice(sig.lastClose) + (sig.prevClose != null ? "  ·  " + fmtPct((sig.lastClose - sig.prevClose) / sig.prevClose * 100) + " vs. período anterior" : "");
+
+    const sigBig = document.getElementById("signalBig");
+    const sigDet = document.getElementById("signalDetail");
+    if (!sig.ok) {
+      sigBig.textContent = "— N/D";
+      sigBig.className = "signal-big neutral";
+      sigDet.textContent = "Todavía no hay suficiente historial para calcular la señal en esta temporalidad.";
+    } else {
+      const cls = sig.signal === "COMPRA" ? "compra" : sig.signal === "VENTA" ? "venta" : "neutral";
+      const icon = sig.signal === "COMPRA" ? "▲" : sig.signal === "VENTA" ? "▼" : "●";
+      sigBig.textContent = `${icon} ${sig.signal}`;
+      sigBig.className = "signal-big " + cls;
+      const rsiTxt = sig.rsi != null ? sig.rsi.toFixed(1) : "—";
+      let why = `Media 20 (${fmtPrice(sig.smaShort)}) ${sig.smaShort > sig.smaLong ? "por encima" : "por debajo"} de la media 50 (${fmtPrice(sig.smaLong)}). RSI(14): ${rsiTxt}.`;
+      if (sig.freshCross) why += " Cruce de medias reciente (últimas 3 velas).";
+      sigDet.textContent = why;
+    }
+
+    drawCharts(series, sig, asset);
+    renderMiniTable(series, sig);
+  }
+
+  function drawCharts(series, sig, asset) {
+    if (typeof Chart === "undefined") {
+      document.querySelector(".chart-wrap").innerHTML =
+        '<div class="empty-detail">No se pudo cargar la librería de gráficos (Chart.js) desde el CDN. Revisá tu conexión y recargá la página.</div>';
+      document.querySelector(".rsi-wrap").innerHTML = "";
+      return;
+    }
+    const labels = series.map(p => fmtDate(p.t));
+    const priceColor = cssVar("--series-price");
+    const sma20Color = cssVar("--series-sma20");
+    const sma50Color = cssVar("--series-sma50");
+    const rsiColor = cssVar("--series-rsi");
+    const gridColor = cssVar("--grid");
+    const mutedColor = cssVar("--text-muted");
+    const textColor = cssVar("--text-secondary");
+
+    if (state.priceChart) state.priceChart.destroy();
+    if (state.rsiChart) state.rsiChart.destroy();
+
+    const ctxP = document.getElementById("priceChart").getContext("2d");
+    state.priceChart = new Chart(ctxP, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "Precio", data: sig.closes, borderColor: priceColor, backgroundColor: priceColor + "1a",
+            borderWidth: 2, pointRadius: 0, tension: 0, fill: true },
+          { label: "SMA 20", data: sig.short, borderColor: sma20Color, borderWidth: 1.5, pointRadius: 0, tension: 0 },
+          { label: "SMA 50", data: sig.long, borderColor: sma50Color, borderWidth: 1.5, pointRadius: 0, tension: 0 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: c => `${c.dataset.label}: ${fmtPrice(c.parsed.y)}` }
+          }
+        },
+        scales: {
+          x: { ticks: { color: mutedColor, maxTicksLimit: 8 }, grid: { color: gridColor } },
+          y: { ticks: { color: mutedColor, callback: v => fmtPrice(v) }, grid: { color: gridColor } }
+        }
+      }
+    });
+
+    const ctxR = document.getElementById("rsiChart").getContext("2d");
+    state.rsiChart = new Chart(ctxR, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "RSI", data: sig.r, borderColor: rsiColor, borderWidth: 1.5, pointRadius: 0, tension: 0 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `RSI: ${c.parsed.y != null ? c.parsed.y.toFixed(1) : "—"}` } }
+        },
+        scales: {
+          x: { display: false },
+          y: {
+            min: 0, max: 100,
+            ticks: { color: mutedColor, stepSize: 50 },
+            grid: {
+              color: ctx => (ctx.tick.value === 30 || ctx.tick.value === 70) ? cssVar("--critical") : gridColor
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderMiniTable(series, sig) {
+    const n = series.length;
+    const rows = [];
+    for (let i = Math.max(0, n - 6); i < n; i++) {
+      rows.push({
+        date: fmtDate(series[i].t),
+        close: sig.closes[i],
+        s20: sig.short[i],
+        s50: sig.long[i],
+        rsi: sig.r[i]
+      });
+    }
+    const thead = `<tr><th>Fecha</th><th>Cierre</th><th>SMA 20</th><th>SMA 50</th><th>RSI</th></tr>`;
+    const tbody = rows.map(r => `<tr>
+        <td>${r.date}</td>
+        <td>${fmtPrice(r.close)}</td>
+        <td>${r.s20 != null ? fmtPrice(r.s20) : "—"}</td>
+        <td>${r.s50 != null ? fmtPrice(r.s50) : "—"}</td>
+        <td>${r.rsi != null ? r.rsi.toFixed(1) : "—"}</td>
+      </tr>`).join("");
+    document.getElementById("miniTable").querySelector("thead").innerHTML = thead;
+    document.getElementById("miniTable").querySelector("tbody").innerHTML = tbody;
+  }
+
+  // ---------- refresh cycle ----------
+  let refreshTimer = null;
+  function setStatus(text, ok) {
+    document.getElementById("statusText").textContent = text;
+    document.getElementById("statusDot").style.background = ok === false ? cssVar("--critical") : cssVar("--good");
+  }
+
+  async function refreshAll() {
+    setStatus("actualizando…", true);
+    await loadAll(CRYPTO_ASSETS, 400);
+    if (state.apiKey) await loadAll(STOCK_ASSETS, 1200);
+    const now = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    setStatus("última actualización " + now, true);
+  }
+
+  function scheduleAutoRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(refreshAll, 5 * 60 * 1000);
+  }
+
+  // ---------- events ----------
+  document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+  document.getElementById("tab1d").addEventListener("click", () => { state.tf = "1d"; renderDetail(); });
+  document.getElementById("tab1w").addEventListener("click", () => { state.tf = "1w"; renderDetail(); });
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    state.theme = state.theme === "dark" ? "light" : "dark";
+    document.getElementById("root").setAttribute("data-theme", state.theme);
+    if (state.selectedId) renderDetail();
+  });
+  document.getElementById("saveKeyBtn").addEventListener("click", () => {
+    const val = document.getElementById("apiKeyInput").value.trim();
+    if (!val) return;
+    state.apiKey = val;
+    document.getElementById("keyStatus").textContent = "Key cargada, buscando acciones…";
+    loadAll(STOCK_ASSETS, 1200);
+  });
+
+  // ---------- init ----------
+  document.getElementById("root").setAttribute("data-theme", "dark");
+  renderCards();
+  refreshAll();
+  scheduleAutoRefresh();
+})();
+</script>
+</body>
+</html>
