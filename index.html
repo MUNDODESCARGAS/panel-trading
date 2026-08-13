@@ -248,7 +248,10 @@
       <span class="item"><span class="swatch" style="background:var(--series-sma20)"></span>Media móvil corta (20)</span>
       <span class="item"><span class="swatch" style="background:var(--series-sma50)"></span>Media móvil larga (50)</span>
     </div>
-    <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="chart-wrap">
+      <canvas id="priceChart"></canvas>
+      <div class="empty-detail hidden" id="chartLibError">No se pudo cargar la librería de gráficos (Chart.js) desde el CDN. Revisá tu conexión y recargá la página.</div>
+    </div>
 
     <div class="legend-row">
       <span class="item"><span class="swatch" style="background:var(--series-rsi)"></span>RSI (14)</span>
@@ -549,6 +552,16 @@
     document.getElementById("tab1d").classList.toggle("active", state.tf === "1d");
     document.getElementById("tab1w").classList.toggle("active", state.tf === "1w");
 
+    const needsKey = (asset.type === "crypto" && !state.coingeckoKey) || (asset.type === "stock" && !state.apiKey);
+    if (needsKey && !d) {
+      document.getElementById("detPrice").textContent = "";
+      document.getElementById("signalBig").textContent = "— N/D";
+      document.getElementById("signalBig").className = "signal-big neutral";
+      document.getElementById("signalDetail").textContent = "Este activo necesita una API key para cargar (ver ⚙️ Configuración arriba de todo).";
+      document.getElementById("miniTable").querySelector("thead").innerHTML = "";
+      document.getElementById("miniTable").querySelector("tbody").innerHTML = "";
+      return;
+    }
     if (!d || d.loading) {
       document.getElementById("detPrice").textContent = "Cargando…";
       return;
@@ -589,12 +602,16 @@
   }
 
   function drawCharts(series, sig, asset) {
+    const libErrorEl = document.getElementById("chartLibError");
     if (typeof Chart === "undefined") {
-      document.querySelector(".chart-wrap").innerHTML =
-        '<div class="empty-detail">No se pudo cargar la librería de gráficos (Chart.js) desde el CDN. Revisá tu conexión y recargá la página.</div>';
-      document.querySelector(".rsi-wrap").innerHTML = "";
+      libErrorEl.classList.remove("hidden");
+      document.getElementById("priceChart").style.display = "none";
+      document.getElementById("rsiChart").style.display = "none";
       return;
     }
+    libErrorEl.classList.add("hidden");
+    document.getElementById("priceChart").style.display = "";
+    document.getElementById("rsiChart").style.display = "";
     const labels = series.map(p => fmtDate(p.t));
     const priceColor = cssVar("--series-price");
     const sma20Color = cssVar("--series-sma20");
