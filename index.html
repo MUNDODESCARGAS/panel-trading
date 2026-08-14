@@ -400,9 +400,22 @@
     if (!state.coingeckoKey) throw new Error("Falta la API key de CoinGecko (ver ⚙️ Configuración)");
     // El plan gratuito ("Demo") de CoinGecko solo permite hasta 365 días de historial
     const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=364&x_cg_demo_api_key=${encodeURIComponent(state.coingeckoKey)}`;
-    const res = await fetch(url);
-    if (res.status === 401 || res.status === 403) throw new Error("API key de CoinGecko inválida, vencida, o el plan no permite este pedido");
-    if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (netErr) {
+      throw new Error("No se pudo conectar a CoinGecko (red/CORS): " + netErr.message);
+    }
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const errJson = await res.json();
+        detail = errJson?.status?.error_message || errJson?.error || JSON.stringify(errJson);
+      } catch (_) {
+        try { detail = await res.text(); } catch (_) { /* ignore */ }
+      }
+      throw new Error(`CoinGecko HTTP ${res.status}${detail ? ": " + detail.slice(0, 160) : ""}`);
+    }
     const json = await res.json();
     const prices = json.prices || [];
     // collapse to one point per UTC day (keep last of each day)
