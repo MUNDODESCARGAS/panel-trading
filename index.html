@@ -398,9 +398,10 @@
   // ---------- fetching ----------
   async function fetchCrypto(id) {
     if (!state.coingeckoKey) throw new Error("Falta la API key de CoinGecko (ver ⚙️ Configuración)");
-    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=500&x_cg_demo_api_key=${encodeURIComponent(state.coingeckoKey)}`;
+    // El plan gratuito ("Demo") de CoinGecko solo permite hasta 365 días de historial
+    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=364&x_cg_demo_api_key=${encodeURIComponent(state.coingeckoKey)}`;
     const res = await fetch(url);
-    if (res.status === 401 || res.status === 403) throw new Error("API key de CoinGecko inválida o vencida");
+    if (res.status === 401 || res.status === 403) throw new Error("API key de CoinGecko inválida, vencida, o el plan no permite este pedido");
     if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
     const json = await res.json();
     const prices = json.prices || [];
