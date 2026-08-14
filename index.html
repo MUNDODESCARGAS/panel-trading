@@ -424,6 +424,19 @@
       const day = new Date(t); day.setUTCHours(0, 0, 0, 0);
       byDay.set(day.getTime(), { t: day.getTime(), c });
     }
+    // agregar/pisar el punto de HOY con el precio en vivo (no el último cierre diario, sino el precio actual)
+    try {
+      const liveUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&x_cg_demo_api_key=${encodeURIComponent(state.coingeckoKey)}`;
+      const liveRes = await fetch(liveUrl);
+      if (liveRes.ok) {
+        const liveJson = await liveRes.json();
+        const livePrice = liveJson?.[id]?.usd;
+        if (typeof livePrice === "number") {
+          const todayUTC = new Date(); todayUTC.setUTCHours(0, 0, 0, 0);
+          byDay.set(todayUTC.getTime(), { t: todayUTC.getTime(), c: livePrice });
+        }
+      }
+    } catch (_) { /* si falla el precio en vivo, seguimos con el último cierre diario */ }
     return Array.from(byDay.values()).sort((a, b) => a.t - b.t);
   }
 
